@@ -5,8 +5,6 @@
 ## Description of the machine to compare
 
 ## Serial, OpenMP and MPI Results
-| BENCHMARK EXECUTION TIME (s)                                    |
-|-------|--------|------------------------------------------------|
 | Class | SERIAL | OPENMP (THREADS) | MPI (TASKS)                 |
 |       |        | 2   | 4   | 8    | 2   | 4   | 8   | 16  | 32  |
 |-------|--------|-----|-----|------|-----|-----|-----|-----|-----|
