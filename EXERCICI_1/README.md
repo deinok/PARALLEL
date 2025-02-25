@@ -2,6 +2,23 @@
 
 ## Analysis of the chosen benchmark
 
+### BT
+BT is a structured grid benchmark that solves a synthetic system of nonlinear partial differential equations.
+It represents implicit finite-difference applications, commonly found in computational fluid dynamics (CFD).
+The computation involves solving block tridiagonal systems at each grid level.
+The computation is dominated by communication between neighboring processes, leading to a high communication overhead.
+It uses coarse-grain parallelism, where large blocks of data are assigned to different processors.
+The main challenge is synchronization, as processes need to communicate frequently to exchange boundary data.
+The memory access pattern is regular, with structured accesses to large matrices.
+
+### FT
+FT is based on 3D Fast Fourier Transform (FFT), which is a spectral method for solving partial differential equations.
+It focuses on floating-point intensive operations, making it useful for evaluating the computational performance of parallel systems.
+FT requires global communication due to the nature of FFT operations.
+The major challenge is all-to-all communication, where data needs to be exchanged between all processors.
+Memory access patterns are less regular compared to BT due to the data transpositions required in FFT computations.
+It is compute-intensive but can be limited by communication bottlenecks.
+
 ## Description of the machine to compare
 
 ## Serial, OpenMP and MPI Results
