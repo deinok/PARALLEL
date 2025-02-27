@@ -12,7 +12,9 @@ The main challenge is synchronization, as processes need to communicate frequent
 The memory access pattern is regular, with structured accesses to large matrices.
 
 ### IS
-
+IS is based on the bucket sort algorithm, which is used to sort a list of randomly generated integers.
+It measures the performance of integer sorting, which is crucial for applications like databases, cryptography, and data analytics.
+The benchmark is memory-access intensive rather than compute-intensive.
 
 ## Description of the machine to compare
 Moore is an homogeneous Cluster with a total of 32 processing units and 32GB of main memory, distributed over 8 nodes with an Intel Core i5 processor with 4 cores at 3.1 GHz and 4GB of main memory.
