@@ -11,13 +11,8 @@ It uses coarse-grain parallelism, where large blocks of data are assigned to dif
 The main challenge is synchronization, as processes need to communicate frequently to exchange boundary data.
 The memory access pattern is regular, with structured accesses to large matrices.
 
-### FT
-FT is based on 3D Fast Fourier Transform (FFT), which is a spectral method for solving partial differential equations.
-It focuses on floating-point intensive operations, making it useful for evaluating the computational performance of parallel systems.
-FT requires global communication due to the nature of FFT operations.
-The major challenge is all-to-all communication, where data needs to be exchanged between all processors.
-Memory access patterns are less regular compared to BT due to the data transpositions required in FFT computations.
-It is compute-intensive but can be limited by communication bottlenecks.
+### IS
+
 
 ## Description of the machine to compare
 Moore is an homogeneous Cluster with a total of 32 processing units and 32GB of main memory, distributed over 8 nodes with an Intel Core i5 processor with 4 cores at 3.1 GHz and 4GB of main memory.
@@ -36,11 +31,11 @@ This aligns with the Distributed Memory Architecture model.
 | B     | 204.14 | 109.97   | 66.93    | 69.20    | 230.09 | 75.80  | ERROR | ERROR  |
 | C     | 847.66 | 469.10   | 282.62   | 285.26   | 955.23 | 320.41 | ERROR | ERROR  |
 
-### FT
-| Class | SERIAL | OPENMP 2 | OPENMP 4 | OPENMP 8 | MPI 2 | MPI 4 | MPI 8 | MPI 16 | MPI 32 |
-|-------|--------|----------|----------|----------|-------|-------|-------|--------|--------|
-| A     | 3.79   |          |          |          |       |       |       |        |        |
-| B     |        |          |          |          |       |       |       |        |        |
-| C     |        |          |          |          |       |       |       |        |        |
+### IS
+| Class | SERIAL | OPENMP 2 | OPENMP 4 | OPENMP 8 | MPI 2  | MPI 4  | MPI 8 | MPI 16 | MPI 32 |
+|-------|--------|----------|----------|----------|--------|--------|-------|--------|--------|
+| A     |        |          |          |          |        |        |       |        |        |
+| B     |        |          |          |          |        |        |       |        |        |
+| C     |        |          |          |          |        |        |       |        |        |
 
 ## Analysis of benchmarking results in relation to main characteristics of the benchmarks
