@@ -20,6 +20,12 @@ Memory access patterns are less regular compared to BT due to the data transposi
 It is compute-intensive but can be limited by communication bottlenecks.
 
 ## Description of the machine to compare
+Moore is an homogeneous Cluster with a total of 32 processing units and 32GB of main memory, distributed over 8 nodes with an Intel Core i5 processor with 4 cores at 3.1 GHz and 4GB of main memory.
+
+The Moore cluster is best classified as a Distributed Memory Architecture rather than a Shared Memory or Hybrid system.
+In a distributed memory system, each processor or node has its own local memory, and processors must communicate using message passing (e.g., MPI - Message Passing Interface).
+Moore’s 8 nodes each have separate memory pools, meaning they must use network-based communication to share data.
+This aligns with the Distributed Memory Architecture model.
 
 ## Serial, OpenMP and MPI Results
 | Class | SERIAL | OPENMP 2 | OPENMP 4 | OPENMP 8 | MPI 2 | MPI 4 | MPI 8 | MPI 16 | MPI 32 |
