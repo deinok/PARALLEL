@@ -30,11 +30,11 @@ This aligns with the Distributed Memory Architecture model.
 ## Serial, OpenMP and MPI Results
 
 ### BT
-| Class | SERIAL | OPENMP 2 | OPENMP 4 | OPENMP 8 | MPI 2 | MPI 4 | MPI 8 | MPI 16 | MPI 32 |
-|-------|--------|----------|----------|----------|-------|-------|-------|--------|--------|
-| A     | 48.01  | 25.64    | 15.19    | 15.91    |       |       |       |        |        |
-| B     | 204.14 | 109.97   | 66.93    | 69.20    |       |       |       |        |        |
-| C     | 847.66 | 469.10   | 282.62   | 285.26   |       |       |       |        |        |
+| Class | SERIAL | OPENMP 2 | OPENMP 4 | OPENMP 8 | MPI 2 | MPI 4  | MPI 8 | MPI 16 | MPI 32 |
+|-------|--------|----------|----------|----------|-------|--------|-------|--------|--------|
+| A     | 48.01  | 25.64    | 15.19    | 15.91    |       | 18.95  |       |        |        |
+| B     | 204.14 | 109.97   | 66.93    | 69.20    |       | 75.80  |       |        |        |
+| C     | 847.66 | 469.10   | 282.62   | 285.26   |       | 320.41 |       |        |        |
 
 ### FT
 | Class | SERIAL | OPENMP 2 | OPENMP 4 | OPENMP 8 | MPI 2 | MPI 4 | MPI 8 | MPI 16 | MPI 32 |
