@@ -40,6 +40,9 @@ This aligns with the Distributed Memory Architecture model.
 | B     | 1.83          | 1.15     | 0.63     | 0.63     | 1.06   | 0.79   | 3.27  | 6.12   | 9.39   |
 | C     | 8.89 (aprox)  | 5.96     | 3.12     | 3.13     | 5.57   | 3.25   | 12.98 | 13.07  | 9.70   |
 
+### Plot
+![./plot.png](./plot.png)
+
 ## Analysis of benchmarking results in relation to main characteristics of the benchmarks
 
 ### Why is the SpeedUp different for different benchmarks?
