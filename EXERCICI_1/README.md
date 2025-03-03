@@ -36,8 +36,8 @@ This aligns with the Distributed Memory Architecture model.
 ### IS
 | Class | SERIAL | OPENMP 2 | OPENMP 4 | OPENMP 8 | MPI 2  | MPI 4  | MPI 8 | MPI 16 | MPI 32 |
 |-------|--------|----------|----------|----------|--------|--------|-------|--------|--------|
-| A     | 0.41   | 0.26     | 0.15     | 0.16     |        |        |       |        |        |
-| B     | 1.83   | 1.15     | 0.63     | 0.63     |        |        |       |        |        |
-| C     | ERROR  | 5.96     | 3.12     | 3.13     |        |        |       |        |        |
+| A     | 0.41   | 0.26     | 0.15     | 0.16     | 0.27   |        |       |        |        |
+| B     | 1.83   | 1.15     | 0.63     | 0.63     | 1.06   |        |       |        |        |
+| C     | ERROR  | 5.96     | 3.12     | 3.13     | 5.57   |        |       |        |        |
 
 ## Analysis of benchmarking results in relation to main characteristics of the benchmarks
