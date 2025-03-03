@@ -41,3 +41,41 @@ This aligns with the Distributed Memory Architecture model.
 | C     | 8.89 (aprox)  | 5.96     | 3.12     | 3.13     | 5.57   | 3.25   | 12.98 | 13.07  | 9.70   |
 
 ## Analysis of benchmarking results in relation to main characteristics of the benchmarks
+
+### Why is the SpeedUp different for different benchmarks?
+
+#### Computation vs. Communication Overhead:
+BT (Block Tridiagonal Solver) is a more compute-intensive benchmark with complex dependencies, meaning parallelization benefits depend on how efficiently tasks are distributed. The overhead of synchronizing computations can limit SpeedUp.
+IS (Integer Sorting) is a memory- and communication-heavy benchmark. Sorting requires frequent data exchanges, which limits performance gains when using more processes.
+
+#### Workload Characteristics:
+BT has structured computation, making it easier to optimize with OpenMP (shared memory) or MPI (distributed memory).
+IS relies on data exchanges, making it more sensitive to communication overhead.
+
+#### Parallelization Efficiency:
+In BT, SpeedUp is relatively higher, especially for OpenMP, because computations are more localized.
+In IS, MPI-based implementations do not scale well, especially with a high number of processes, due to increasing communication costs.
+
+### Is Efficiency equal for any benchmark?
+No, efficiency is not equal across benchmarks due to varying computation-to-communication ratios.
+
+BT maintains better efficiency in OpenMP cases, as it benefits from shared memory and minimal communication overhead.
+IS exhibits lower efficiency in MPI cases, especially with many processes, because communication and memory access bottlenecks increase.
+
+So, efficiency varies significantly across benchmarks and programming models.
+
+### How is the benchmark’s scalability?
+Scalability refers to how well a program maintains performance gains as more threads or processes are added.
+* BT shows better strong scalability in OpenMP, meaning that increasing threads improves performance significantly, but there are diminishing returns.
+* IS scales poorly in MPI, especially beyond MPI 8, due to increasing communication overhead.
+
+### Why is scalability so different for OpenMP and MPI?
+OpenMP (shared memory) performs better for BT because:
+* No need to transfer data between nodes.
+* Lower communication overhead.
+* Works best on a single machine with many cores.
+MPI (distributed memory) struggles for IS because:
+* Sorting requires frequent data movement between nodes.
+* High communication cost reduces scalability.
+* MPI works better for embarrassingly parallel problems, which IS is not.
+Thus, OpenMP generally scales better within a single machine, while MPI struggles with communication-heavy workloads.
