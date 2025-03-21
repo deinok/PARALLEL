@@ -1,6 +1,7 @@
+#include <math.h>
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include <time.h>
 
 #define BMP_HEADER_SIZE 54
@@ -147,7 +148,7 @@ void write_grid(FILE* file, double* grid, int nx, int ny)
 }
 
 // Main function
-int main(int argc, char *argv[]) {
+int main(int argc, char** argv) {
     clock_t time_begin, time_end;
     char car;
     double r; // constant of the heat equation
