@@ -41,7 +41,7 @@ void solve_heat_equation(double* grid, double* new_grid, int steps, double r, in
     int step, i, j;
     double* temp;
     for (step = 0; step < steps; step++) {
-        // Compute the new grid
+        #pragma omp parallel for private(i, j) collapse(2)
         for (i = 1; i < nx - 1; i++) {
             for (j = 1; j < ny - 1; j++) {
                 new_grid[i * ny + j] = grid[i * ny + j]
@@ -50,7 +50,7 @@ void solve_heat_equation(double* grid, double* new_grid, int steps, double r, in
             }
         }
         // Apply boundary conditions (Dirichlet: u=0 on boundaries)
-        for ( i = 0; i < nx; i++) {
+        for (i = 0; i < nx; i++) {
             new_grid[0 * ny + i] = 0.0;
             new_grid[ny * (nx - 1) + i] = 0.0;
         }
