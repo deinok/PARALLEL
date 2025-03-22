@@ -25,8 +25,9 @@ void print_grid(double* grid, int nx, int ny) {
 }
 
 // Function to initialize the grid
-void initialize_grid(double* grid, int nx, int ny,int temp_source) {
+void initialize_grid(double* grid, int nx, int ny, int temp_source) {
     int i, j;
+    #pragma omp parallel for private(i, j) collapse(2)
     for (i = 0; i < nx; i++) {
         for (j = 0; j < ny; j++) {
            if (i == j) { grid[i * ny + j] = 1500.0; }
