@@ -143,8 +143,9 @@ void write_grid(FILE* file, double* grid, int nx, int ny)
     // Write pixel data to BMP file
     for (i = nx - 1; i >= 0; i--) { // BMP format stores pixels bottom-to-top
         for (j = 0; j < ny; j++) {
+            int inyj = i * ny + j;
             unsigned char r, g, b;
-            get_color(grid[i * ny + j], &r, &g, &b);
+            get_color(grid[inyj], &r, &g, &b);
             fwrite(&b, 1, 1, file); // Write blue channel
             fwrite(&g, 1, 1, file); // Write green channel
             fwrite(&r, 1, 1, file); // Write red channel
