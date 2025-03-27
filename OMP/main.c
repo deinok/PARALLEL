@@ -144,11 +144,9 @@ void write_grid(FILE* file, double* grid, int nx, int ny)
     for (i = nx - 1; i >= 0; i--) { // BMP format stores pixels bottom-to-top
         for (j = 0; j < ny; j++) {
             int inyj = i * ny + j;
-            unsigned char r, g, b;
-            get_color(grid[inyj], &r, &g, &b);
-            fwrite(&b, 1, 1, file); // Write blue channel
-            fwrite(&g, 1, 1, file); // Write green channel
-            fwrite(&r, 1, 1, file); // Write red channel
+            unsigned char color[3];
+            get_color(grid[inyj], &color[2], &color[1], &color[0]);
+            fwrite(color, 1, 3, file); // Write color channel
         }
         // Row padding for 4-byte alignment (if necessary)
         for (padding = 0; padding < (4 - (nx * 3) % 4) % 4; padding++) {
