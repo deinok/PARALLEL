@@ -25,13 +25,15 @@ void print_grid(double* grid, int nx, int ny) {
 }
 
 // Function to initialize the grid
-void initialize_grid(double* grid, int nx, int ny,int temp_source) {
+void initialize_grid(double* grid, int nx, int ny, int temp_source) {
     int i, j;
+    #pragma omp parallel for private(i, j) collapse(2)
     for (i = 0; i < nx; i++) {
         for (j = 0; j < ny; j++) {
-           if (i == j) { grid[i * ny + j] = 1500.0; }
-           else if (i == nx - 1 - j) { grid[i * ny + j] = 1500.0; }
-           else { grid[i * ny + j] = 0.0;}
+            int inyj = i * ny + j;
+            if (i == j) { grid[inyj] = 1500.0; }
+            else if (i == nx - 1 - j) { grid[inyj] = 1500.0; }
+            else { grid[inyj] = 0.0;}
         }
     }
 }
@@ -41,24 +43,31 @@ void solve_heat_equation(double* grid, double* new_grid, int steps, double r, in
     int step, i, j;
     double* temp;
     for (step = 0; step < steps; step++) {
-        // Compute the new grid
+
+        // Apply equation
+        #pragma omp parallel for private(i, j) collapse(2)
         for (i = 1; i < nx - 1; i++) {
             for (j = 1; j < ny - 1; j++) {
-                new_grid[i * ny + j] = grid[i * ny + j]
-                + r * (grid[(i + 1) * ny + j] + grid[(i - 1) * ny + j] -2 * grid[i * ny + j])
-                + r * (grid[i * ny + j + 1] + grid[i * ny + j - 1] -2 * grid[i * ny + j]);
+                int inyj = i * ny + j;
+                new_grid[inyj] = grid[inyj]
+                    + r * (grid[(i + 1) * ny + j] + grid[(i - 1) * ny + j] -2 * grid[inyj])
+                    + r * (grid[inyj + 1] + grid[inyj - 1] -2 * grid[inyj]);
             }
         }
+
         // Apply boundary conditions (Dirichlet: u=0 on boundaries)
-        for ( i = 0; i < nx; i++) {
+        #pragma omp parallel for private(i)
+        for (i = 0; i < nx; i++) {
             new_grid[0 * ny + i] = 0.0;
             new_grid[ny * (nx - 1) + i] = 0.0;
         }
+        #pragma omp parallel for private(j)
         for (j = 0; j < ny; j++) {
             new_grid[0 + j * nx] = 0.0;
             new_grid[(ny - 1) + j * nx] = 0.0;
-        }        // Swap the grids
+        }
 
+        // Swap the grids
         temp = grid;
         grid = new_grid;
         new_grid = temp;
@@ -134,9 +143,12 @@ void write_grid(FILE* file, double* grid, int nx, int ny)
     // Write pixel data to BMP file
     for (i = nx - 1; i >= 0; i--) { // BMP format stores pixels bottom-to-top
         for (j = 0; j < ny; j++) {
-            unsigned char color[3];
-            get_color(grid[i * ny + j], &color[2], &color[1], &color[0]);
-            fwrite(color, 1, 3, file); // Write color channel
+            int inyj = i * ny + j;
+            unsigned char r, g, b;
+            get_color(grid[inyj], &r, &g, &b);
+            fwrite(&b, 1, 1, file); // Write blue channel
+            fwrite(&g, 1, 1, file); // Write green channel
+            fwrite(&r, 1, 1, file); // Write red channel
         }
         // Row padding for 4-byte alignment (if necessary)
         for (padding = 0; padding < (4 - (nx * 3) % 4) % 4; padding++) {
@@ -147,7 +159,7 @@ void write_grid(FILE* file, double* grid, int nx, int ny)
 
 // Main function
 int main(int argc, char** argv) {
-    clock_t time_begin, time_end;
+    double time_begin, time_end;
     char car;
     double r; // constant of the heat equation
     int nx, ny;  // Grid size in x-direction and y-direction
@@ -163,7 +175,7 @@ int main(int argc, char** argv) {
     nx = ny = atoi(argv[1]);
     r = ALPHA * DT / (DX * DY);
     steps = atoi(argv[2]);
-    time_begin = clock();
+    time_begin = omp_get_wtime();
     // Allocate memory for the grid
     double* grid = (double *)calloc(nx * ny, sizeof(double));
     double* new_grid = (double *)calloc(nx * ny, sizeof(double));
@@ -189,8 +201,8 @@ int main(int argc, char** argv) {
     // Free allocated memory
     free(grid);
     free(new_grid);
-    time_end = clock();
-    printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", (time_end - time_begin) / (double)CLOCKS_PER_SEC, nx, nx, steps);
+    time_end = omp_get_wtime();
+    printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", time_end - time_begin, nx, nx, steps);
     return 0;
 }
 
