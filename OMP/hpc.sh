@@ -1,10 +1,16 @@
 #!/bin/bash
-# Force the shell to be the C-shell
-#$ -S /bin/csh
-# Request 2 GBytes of virtual memory
-#$ -l h_vmem=2G
-# Specify myresults as the output file
-#$ -o myresults
+## Specifies the interpreting shell for the job.
+#$ -S /bin/bash
+
+## Specifies that all environment variables active within the qsub utility be exported to the context of the job.
+#$ -V
+
+## Execute the job from the current working directory.
+#$ -cwd 
+
+## The  name  of  the  job.
+#$ -N OMP
+
 
 if [ "$#" -ne 3 ]; then
   echo "Usage: $0 <program> <size> <steps>"
