@@ -1,0 +1,12 @@
+The Execution Time=1.671250s with a matrix size of 1000x1000 and 100 steps
+The Execution Time=13.486841s with a matrix size of 1000x1000 and 1000 steps
+The Execution Time=33.677816s with a matrix size of 1000x1000 and 10000 steps
+The Execution Time=698.878759s with a matrix size of 1000x1000 and 100000 steps
+The Execution Time=0.006104s with a matrix size of 100x100 and 100 steps
+The Execution Time=0.040334s with a matrix size of 100x100 and 1000 steps
+The Execution Time=26.465748s with a matrix size of 100x100 and 10000 steps
+The Execution Time=33.893508s with a matrix size of 100x100 and 100000 steps
+The Execution Time=5.421353s with a matrix size of 2000x2000 and 100 steps
+The Execution Time=33.636055s with a matrix size of 2000x2000 and 1000 steps
+The Execution Time=135.988130s with a matrix size of 2000x2000 and 10000 steps
+The Execution Time=1499.213647s with a matrix size of 2000x2000 and 100000 steps
