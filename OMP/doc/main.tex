@@ -56,10 +56,13 @@
 \thispagestyle{empty}
 \tableofcontents
 \pagebreak
+\thispagestyle{empty}
+\listoftables
+\pagebreak
 
 \section{Main Decisions Taken to Parallelize the Problem}
 
-We encountered we SMPD (Single Program Multiple Data) problem which we could parallelize using OpenMP. 
+We encountered we SMPD (Single Program Multiple Data) problem which we could parallelize using OpenMP.
 
 This section details each part of the serial code that was identified as suitable for parallelization, along with the strategies employed:
 
@@ -67,7 +70,7 @@ This section details each part of the serial code that was identified as suitabl
 
 \subsubsection{Parallelizable Section}
 The initialization loop sets the temperature for each cell independently.
-\begin{lstlisting}[language=C]
+\begin{lstlisting}[language=C, basicstyle=\scriptsize\ttfamily]
 for (i = 0; i < nx; i++) {
 	for (j = 0; j < ny; j++) {
 		int inyj = i * ny + j;
@@ -143,42 +146,94 @@ The output phase remains serial due to the order dependency and the relatively s
 
 Execution times are measured using \texttt{omp\_get\_wtime()}.
 Testing is conducted using various grid sizes (matrix sizes) and numbers of iteration steps.
+\\\\
+Just to clarify, we run the following tests in the moore cluster where we used the full 4 cores of each node.
 
 \subsection{Performance Metrics and Their Formulas}
+
 
 \begin{table}[h!]
 	\centering
 	\begin{tabular}{lcccc}
-	\hline
-	\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}} \\
-	\cline{2-5}
-	 & \textbf{100} & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
-	\hline
-	100x100 &  &  &  &  \\
-	1000x1000 &  &  &  &  \\
-	2000x2000 &  &  &  &  \\
-	\hline
+		\hline
+		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{2-5}
+		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$100\times 100$      & 0.010000s                          & 0.100000s     & 1.080000s      & 10.820000s      \\
+		$1000\times 1000$    & 1.200000s                          & 12.780000s    & 119.870000s    & 1070.680000s    \\
+		$2000\times 2000$    & 4.750000s                          & 47.630000s    & 503.060000s    & 4310.300000s    \\
+		\hline
 	\end{tabular}
 	\caption{Execution times of the \texttt{heat\_serial} program.}
 	\label{tab:serial_times}
-	\end{table}
+\end{table}
 
-	\begin{table}[h!]
-		\centering
-		\begin{tabular}{lcccc}
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lcccc}
 		\hline
-		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}} \\
+		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
 		\cline{2-5}
-		 & \textbf{100} & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
 		\hline
-		100x100 &  &  &  &  \\
-		1000x1000 &  &  &  &  \\
-		2000x2000 &  &  &  &  \\
+		$100\times 100$      & 0.006104s                          & 0.040334s     & 26.465748s     & 33.893508s      \\
+		$1000\times 1000$    & 1.671250s                          & 13.486841s    & 33.677816s     & 698.878759s     \\
+		$2000\times 2000$    & 5.421353s                          & 33.636055s    & 135.988130s    & 1499.213647s    \\
 		\hline
-		\end{tabular}
-		\caption{Execution times of the \texttt{heat\_serial} parallel program.}
-		\label{tab:omp_times}
-		\end{table}
+	\end{tabular}
+	\caption{Execution times of the \texttt{heat\_serial} parallel program.}
+	\label{tab:omp_times}
+\end{table}
+
+\newpage
+\subsection{Speedup and Efficiency}
+Speedup formula:
+\begin{equation}
+	S = \frac{T_{serial}}{T_{parallel}}
+\end{equation}
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lcccc}
+		\hline
+		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{2-5}
+		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$100\times 100$      & 1.63                               & 2.48          & 0.04           & 0.32            \\
+		$1000\times 1000$    & 0.72                               & 0.95          & 3.56           & 1.53            \\
+		$2000\times 2000$    & 0.87                               & 1.42          & 3.69           & 2.88            \\
+		\hline
+	\end{tabular}
+	\caption{Speedup of the parallel program with respect to the serial one.}
+	\label{tab:speedup}
+\end{table}
+
+Efficiency formula:
+\begin{equation}
+	E = \frac{S}{P}
+\end{equation}
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lcccc}
+		\hline
+		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{2-5}
+		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$100\times 100$      & 0.81                               & 0.62          & 0.01           & 0.08            \\
+		$1000\times 1000$    & 0.36                               & 0.48          & 0.36           & 0.38            \\
+		$2000\times 2000$    & 0.43                               & 0.71          & 0.37           & 0.58            \\
+		\hline
+	\end{tabular}
+	\caption{Efficiency of the parallel program with respect to the serial one.}
+	\label{tab:efficiency}
+\end{table}
+
+\subsection{Scalability Analysis}
+The program demonstrates good scalability, particularly for larger matrix sizes and higher iteration counts. The speedup and efficiency metrics indicate that the parallel implementation effectively utilizes available resources, especially for larger problem sizes.
 
 
 
