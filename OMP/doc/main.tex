@@ -63,8 +63,10 @@
 \section{Main Decisions Taken to Parallelize the Problem}
 
 We encountered we SMPD (Single Program Multiple Data) problem which we could parallelize using OpenMP.
-
-This section details each part of the serial code that was identified as suitable for parallelization, along with the strategies employed:
+\\\\
+This section details each part of the serial code that was identified as suitable for parallelization, along with the strategies employed.
+\\\\
+Also we applied some optimizations to the code, like not recalculating the array indexes for each operation, instead we calculated them once and stored them in a variable.
 
 \subsection{Grid Initialization (initialize\_grid)}
 
@@ -137,7 +139,8 @@ The swapping of pointers between \texttt{grid} and \texttt{new\_grid} is perform
 The generation and writing of the BMP file require a strict order of operations (bottom-to-top row order and specific padding for each row), which is highly sequential.
 
 \subsubsection{Decision}
-The output phase remains serial due to the order dependency and the relatively small impact on overall performance.
+The output phase remains serial due to the order dependency and the relatively small impact on overall performance. But what we did is optimize the code without parallelizing it.
+Exactly we reduced the number of times we write to the file by writing three bytes at once instead.
 
 \newpage
 \section{Scalability of the Program}
@@ -182,7 +185,7 @@ Just to clarify, we run the following tests in the moore cluster where we used t
 		$2000\times 2000$    & 5.421353s                          & 33.636055s    & 135.988130s    & 1499.213647s    \\
 		\hline
 	\end{tabular}
-	\caption{Execution times of the \texttt{heat\_serial} parallel program.}
+	\caption{Execution times of the \texttt{heat\_parallel} program.}
 	\label{tab:omp_times}
 \end{table}
 
@@ -215,6 +218,8 @@ Efficiency formula:
 	E = \frac{S}{P}
 \end{equation}
 
+Where $P$ is the number of threads used. In our case, we used 4 threads.
+
 \begin{table}[h!]
 	\centering
 	\begin{tabular}{lcccc}
@@ -223,9 +228,9 @@ Efficiency formula:
 		\cline{2-5}
 		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
 		\hline
-		$100\times 100$      & 0.81                               & 0.62          & 0.01           & 0.08            \\
-		$1000\times 1000$    & 0.36                               & 0.48          & 0.36           & 0.38            \\
-		$2000\times 2000$    & 0.43                               & 0.71          & 0.37           & 0.58            \\
+		$100\times 100$      & 0.41                               & 0.62          & 0.01           & 0.08            \\
+		$1000\times 1000$    & 0.18                               & 0.24          & 0.89           & 0.38            \\
+		$2000\times 2000$    & 0.22                               & 0.36          & 0.92           & 0.72            \\
 		\hline
 	\end{tabular}
 	\caption{Efficiency of the parallel program with respect to the serial one.}
