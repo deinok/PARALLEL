@@ -1,4 +1,5 @@
 # EXERCICI_1
+**Authors:** Marc Gaspà & Raul Hidalgo
 
 ## Analysis of the chosen benchmark
 
