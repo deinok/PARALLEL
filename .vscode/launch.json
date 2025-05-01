@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run MPI Program",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/opt/homebrew/bin/mpirun",
+      "args": [
+        "-np",
+        "4",
+        "${workspaceFolder}/build/OMP_MPI",
+        "100",
+        "1000",
+        "test.bmp"
+      ],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "environment": [],
+      "externalConsole": true, // Set to true to enable an external console for viewing prints
+      "MIMode": "lldb"
+    }
+  ]
+}

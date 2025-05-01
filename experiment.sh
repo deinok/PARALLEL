@@ -2,10 +2,12 @@
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
-  echo "Usage: $0 <program>"
+  echo "Usage: $0 <hpc_file> <program>"
   exit 1
 fi
-program="$1"
+
+hpc_file="$1"
+program="$2"
 
 machines=(2 4 8)              # number of nodes to request
 sizes=(100 1000 2000)
@@ -24,7 +26,7 @@ for m in "${machines[@]}"; do
         -o "logs/${jobname}.out" \
         -e "logs/${jobname}.err" \
         -cwd \
-        ./hpc.sh "$program" "$size" "$steps" "$m"
+        ./"$hpc_file" "$program" "$size" "$steps" "$m"
     done
   done
 done
