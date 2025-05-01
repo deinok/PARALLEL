@@ -63,20 +63,15 @@ void solve_heat_equation(double *grid, double *new_grid,
     double *temp;
     for (step = 0; step < steps; step++)
     {
+        // Exchange boundary rows with neighboring processes
         if (rank > 0)
-            MPI_Sendrecv(&grid[1 * ny], ny, MPI_DOUBLE, rank - 1, 0,
-                         &grid[0 * ny], ny, MPI_DOUBLE, rank - 1, 1,
+            MPI_Sendrecv(&grid[ny], ny, MPI_DOUBLE, rank - 1, 0,
+                         &grid[0], ny, MPI_DOUBLE, rank - 1, 1,
                          MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        else
-            for (j = 0; j < ny; j++)
-                grid[0 * ny + j] = 0.0;
         if (rank < size - 1)
             MPI_Sendrecv(&grid[(nx - 2) * ny], ny, MPI_DOUBLE, rank + 1, 1,
                          &grid[(nx - 1) * ny], ny, MPI_DOUBLE, rank + 1, 0,
                          MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        else
-            for (j = 0; j < ny; j++)
-                grid[(nx - 1) * ny + j] = 0.0;
 
 #pragma omp parallel for private(i, j) collapse(2)
         for (i = 1; i < nx - 1; i++)
@@ -89,16 +84,19 @@ void solve_heat_equation(double *grid, double *new_grid,
         }
 
 #pragma omp parallel for private(i)
+        for (i = 0; i < ny; i++)
+        {
+            if (rank == 0)
+                new_grid[1 * ny + i] = 0.0;
+            if (rank == size - 1)
+                new_grid[(nx - 2) * ny + i] = 0.0;
+        }
+
+#pragma omp parallel for private(i)
         for (i = 0; i < nx; i++)
         {
-            new_grid[0 * ny + i] = 0.0;
-            new_grid[ny * (nx - 1) + i] = 0.0;
-        }
-#pragma omp parallel for private(j)
-        for (j = 0; j < ny; j++)
-        {
-            new_grid[0 + j * nx] = 0.0;
-            new_grid[(ny - 1) + j * nx] = 0.0;
+            new_grid[i * ny + 0] = 0.0;
+            new_grid[i * ny + (ny - 1)] = 0.0;
         }
 
         temp = grid;
@@ -232,8 +230,8 @@ int main(int argc, char **argv)
     time_begin = omp_get_wtime();
 
     // Static descomposition of the grid
-    int rows_per_proc = nx / size;
-    int local_nx = rows_per_proc;
+    int rows_per_proc = nx / size; //! Will cause problems if nx is not divisible by size
+    int local_nx = rows_per_proc + 2;
 
     // Allocate memory for the grid
     double *grid = NULL;
@@ -263,7 +261,8 @@ int main(int argc, char **argv)
         ny, rank, size);
 
     MPI_Gather(
-        local_grid, rows_per_proc * ny, MPI_DOUBLE,
+        &local_grid[ny],
+        rows_per_proc * ny, MPI_DOUBLE,
         grid, rows_per_proc * ny, MPI_DOUBLE,
         0, MPI_COMM_WORLD);
 

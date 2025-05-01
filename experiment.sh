@@ -9,7 +9,7 @@ fi
 hpc_file="$1"
 program="$2"
 
-machines=(2 4 8)              # number of nodes to request
+machines=(2 4)              # number of nodes to request
 sizes=(100 1000 2000)
 steps_list=(100 1000 10000 100000)
 
