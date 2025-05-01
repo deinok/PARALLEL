@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <mpi.h>
 
 #define BMP_HEADER_SIZE 54
 #define ALPHA 0.01 // Thermal diffusivity
@@ -53,14 +54,30 @@ void initialize_grid(double *grid, int nx, int ny, int temp_source)
     }
 }
 
-void solve_heat_equation(double *grid, double *new_grid, int steps, double r, int nx, int ny)
+void solve_heat_equation(double *grid, double *new_grid,
+                         int steps, double r,
+                         int nx, int ny,
+                         int rank, int size)
 {
     int step, i, j;
     double *temp;
     for (step = 0; step < steps; step++)
     {
+        if (rank > 0)
+            MPI_Sendrecv(&grid[1 * ny], ny, MPI_DOUBLE, rank - 1, 0,
+                         &grid[0 * ny], ny, MPI_DOUBLE, rank - 1, 1,
+                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        else
+            for (j = 0; j < ny; j++)
+                grid[0 * ny + j] = 0.0;
+        if (rank < size - 1)
+            MPI_Sendrecv(&grid[(nx - 2) * ny], ny, MPI_DOUBLE, rank + 1, 1,
+                         &grid[(nx - 1) * ny], ny, MPI_DOUBLE, rank + 1, 0,
+                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        else
+            for (j = 0; j < ny; j++)
+                grid[(nx - 1) * ny + j] = 0.0;
 
-// Apply equation
 #pragma omp parallel for private(i, j) collapse(2)
         for (i = 1; i < nx - 1; i++)
         {
@@ -71,7 +88,6 @@ void solve_heat_equation(double *grid, double *new_grid, int steps, double r, in
             }
         }
 
-// Apply boundary conditions (Dirichlet: u=0 on boundaries)
 #pragma omp parallel for private(i)
         for (i = 0; i < nx; i++)
         {
@@ -85,7 +101,6 @@ void solve_heat_equation(double *grid, double *new_grid, int steps, double r, in
             new_grid[(ny - 1) + j * nx] = 0.0;
         }
 
-        // Swap the grids
         temp = grid;
         grid = new_grid;
         new_grid = temp;
@@ -197,6 +212,7 @@ int main(int argc, char **argv)
     double r;   // constant of the heat equation
     int nx, ny; // Grid size in x-direction and y-direction
     int steps;  // Number of time steps
+    int rank, size;
     // double DT;
     if (argc != 4)
     {
@@ -205,37 +221,79 @@ int main(int argc, char **argv)
         printf("Try again!!!!\n");
         return 1;
     }
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
     nx = ny = atoi(argv[1]);
     r = ALPHA * DT / (DX * DY);
     steps = atoi(argv[2]);
     time_begin = omp_get_wtime();
+
+    // Static descomposition of the grid
+    int rows_per_proc = nx / size;
+    int local_nx = rows_per_proc;
+
     // Allocate memory for the grid
-    double *grid = (double *)calloc(nx * ny, sizeof(double));
-    double *new_grid = (double *)calloc(nx * ny, sizeof(double));
-
-    // Initialize the grid
-    initialize_grid(grid, nx, ny, T);
-
-    // Solve heat equation
-    solve_heat_equation(grid, new_grid, steps, r, nx, ny);
-    // Write grid into a bmp file
-    FILE *file = fopen(argv[3], "wb");
-    if (!file)
+    double *grid = NULL;
+    double *new_grid = NULL;
+    if (rank == 0)
     {
-        printf("Error opening the output file.\n");
-        return 1;
+        grid = calloc(nx * ny, sizeof(double));
+        new_grid = calloc(nx * ny, sizeof(double));
+        initialize_grid(grid, nx, ny, T);
     }
 
-    write_bmp_header(file, nx, ny);
-    write_grid(file, grid, nx, ny);
+    double *local_grid = (double *)calloc((rows_per_proc + 2) * ny, sizeof(double));
+    double *local_new_grid = (double *)calloc((rows_per_proc + 2) * ny, sizeof(double));
 
-    fclose(file);
-    // Function to visualize the values of the temperature. Use only for debugging
-    //  print_grid(grid, nx, ny);
-    //  Free allocated memory
-    free(grid);
-    free(new_grid);
+    MPI_Scatter(
+        grid, rows_per_proc * ny, MPI_DOUBLE,
+        &local_grid[ny], rows_per_proc * ny, MPI_DOUBLE,
+        0, MPI_COMM_WORLD);
+
+    // Solve heat equation
+    solve_heat_equation(
+        local_grid,
+        local_new_grid,
+        steps,
+        r,
+        local_nx,
+        ny, rank, size);
+
+    MPI_Gather(
+        local_grid, rows_per_proc * ny, MPI_DOUBLE,
+        grid, rows_per_proc * ny, MPI_DOUBLE,
+        0, MPI_COMM_WORLD);
+
+    if (rank == 0)
+    {
+        // Write grid into a bmp file
+        FILE *file = fopen(argv[3], "wb");
+        if (!file)
+        {
+            printf("Error opening the output file.\n");
+            return 1;
+        }
+
+        write_bmp_header(file, nx, ny);
+        write_grid(file, grid, nx, ny);
+
+        fclose(file);
+        // Function to visualize the values of the temperature. Use only for debugging
+        //  print_grid(grid, nx, ny);
+        //  Free allocated memory
+        free(grid);
+        free(new_grid);
+    }
+
+    free(local_grid);
+    free(local_new_grid);
+
     time_end = omp_get_wtime();
     printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", time_end - time_begin, nx, nx, steps);
+
+    MPI_Finalize();
     return 0;
 }
