@@ -1,0 +1,245 @@
+\documentclass[12pt]{article}
+
+
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{amsmath} % added to define math text commands
+
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+
+\usepackage{a4wide}
+
+\usepackage{blindtext}
+\renewcommand{\baselinestretch}{1.25}  
+\newcommand\crule[3][black]{\textcolor{#1}{\rule{#2}{#3}}}
+ 
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Marc Gaspà Joval\\Raul Hidalgo Caballero}
+\lhead{\includegraphics[width=2.5cm]{logoudl.png}}
+\setlength{\headheight}{30pt}
+
+\fancyfoot[R]{\thepage}
+\rfoot{\thepage}
+\renewcommand{\footrulewidth}{0.4pt}
+\setlength{\footskip}{25pt}
+
+
+\graphicspath{{images/}}
+
+\begin{document}
+\begin{titlepage}
+	\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+	\center
+
+	\includegraphics[width=5cm]{logoudl.png}\\
+	\textsc{\Large MEINF}\\[0.5cm]
+	\textsc{\large High Performance Computing}\\[0.5cm]
+
+	\HRule\\[0.4cm]
+
+	{\huge\bfseries HPC Project: Heat Diffusion Equation}\\[0.4cm]
+	{\LARGE First Delivery (OpenMP)}
+	\HRule\\[1.5cm]
+
+	\textsc{Marc Gaspà Joval\\Raul Hidalgo Caballero}
+
+	\vfill\vfill\vfill
+	{\large\today}
+\end{titlepage}
+\pagebreak
+\thispagestyle{empty}
+\tableofcontents
+\pagebreak
+\thispagestyle{empty}
+\listoftables
+\pagebreak
+
+\section{Main Decisions Taken to Parallelize the Problem}
+
+We encountered we SMPD (Single Program Multiple Data) problem which we could parallelize using OpenMP.
+\\\\
+This section details each part of the serial code that was identified as suitable for parallelization, along with the strategies employed.
+\\\\
+Also we applied some optimizations to the code, like not recalculating the array indexes for each operation, instead we calculated them once and stored them in a variable.
+
+\subsection{Grid Initialization (initialize\_grid)}
+
+\subsubsection{Parallelizable Section}
+The initialization loop sets the temperature for each cell independently.
+\begin{lstlisting}[language=C, basicstyle=\scriptsize\ttfamily]
+for (i = 0; i < nx; i++) {
+	for (j = 0; j < ny; j++) {
+		int inyj = i * ny + j;
+		if (i == j) { grid[inyj] = 1500.0; }
+		else if (i == nx - 1 - j) { grid[inyj] = 1500.0; }
+		else { grid[inyj] = 0.0; }
+	}
+}
+\end{lstlisting}
+
+
+\subsubsection{Strategy}
+In this case as there aren't any dependencies we used \texttt{\#pragma omp parallel for} with the \texttt{collapse(2)} clause on the nested loops to distribute the iterations.
+
+\pagebreak
+\subsection{Computation of the Heat Equation (solve\_heat\_equation)}
+
+\subsubsection{Parallelizable Section}
+In this case, as one step is dependent of the previous one we cannot parallelize the outer loop. However, the inner loop can parallelize two parts, the first one is the aplication of the heat equation:
+\begin{lstlisting}[language=C, basicstyle=\scriptsize\ttfamily]
+for (i = 1; i < nx - 1; i++) {
+	for (j = 1; j < ny - 1; j++) {
+		int inyj = i * ny + j;
+		new_grid[inyj] = grid[inyj]
+		+ r * (grid[(i + 1) * ny + j] + grid[(i - 1) * ny + j] - 2 * grid[inyj])
+		+ r * (grid[inyj + 1] + grid[inyj - 1] - 2 * grid[inyj]);
+	}
+}
+\end{lstlisting}
+The second one is the application of the boundary conditions:
+\begin{lstlisting}[language=C, basicstyle=\scriptsize\ttfamily]
+for (i = 0; i < nx; i++) {
+		new_grid[0 * ny + i] = 0.0;
+		new_grid[ny * (nx - 1) + i] = 0.0;
+}
+
+for (j = 0; j < ny; j++) {
+		new_grid[0 + j * nx] = 0.0;
+		new_grid[(ny - 1) + j * nx] = 0.0;
+}
+
+\end{lstlisting}
+
+\subsubsection{Strategy}
+In this case we really used a similar solution for both cases, as each cell can be calculated independently from the others.
+\\
+We used \texttt{\#pragma omp parallel for} with the \texttt{collapse(2)} clause on the heat equation loop to distribute the iterations. We defined the variables \texttt{i} and \texttt{j} as private.
+\\\\
+For the boundary conditions we added \texttt{\#pragma omp parallel for} to the loops that set the values of the boundaries. We also defined the variable \texttt{i} as private in the first loop and \texttt{j} in the second one.
+
+
+\newpage
+\subsection{Data Dependency Management}
+
+\subsubsection{Overall Approach}
+A two-buffer scheme is employed throughout the computational phase. While one buffer holds the original data (read-only), the other is used for storing computed updates.
+
+\subsubsection{Synchronization}
+The swapping of pointers between \texttt{grid} and \texttt{new\_grid} is performed outside parallel regions, ensuring data integrity for the subsequent computation cycle.
+
+\subsection{Serial Output Operation}
+
+\subsubsection{Analysis}
+The generation and writing of the BMP file require a strict order of operations (bottom-to-top row order and specific padding for each row), which is highly sequential.
+
+\subsubsection{Decision}
+The output phase remains serial due to the order dependency and the relatively small impact on overall performance. But what we did is optimize the code without parallelizing it.
+Exactly we reduced the number of times we write to the file by writing three bytes at once instead.
+
+\newpage
+\section{Scalability of the Program}
+
+\subsection{Performance Measurement Methodology}
+
+Execution times are measured using \texttt{omp\_get\_wtime()}.
+Testing is conducted using various grid sizes (matrix sizes) and numbers of iteration steps.
+\\\\
+Just to clarify, we run the following tests in the moore cluster where we used the full 4 cores of each node.
+
+\subsection{Performance Metrics and Their Formulas}
+
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lcccc}
+		\hline
+		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{2-5}
+		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$100\times 100$      & 0.010000s                          & 0.100000s     & 1.080000s      & 10.820000s      \\
+		$1000\times 1000$    & 1.200000s                          & 12.780000s    & 119.870000s    & 1070.680000s    \\
+		$2000\times 2000$    & 4.750000s                          & 47.630000s    & 503.060000s    & 4310.300000s    \\
+		\hline
+	\end{tabular}
+	\caption{Execution times of the \texttt{heat\_serial} program.}
+	\label{tab:serial_times}
+\end{table}
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lcccc}
+		\hline
+		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{2-5}
+		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$100\times 100$      & 0.006104s                          & 0.040334s     & 26.465748s     & 33.893508s      \\
+		$1000\times 1000$    & 1.671250s                          & 13.486841s    & 33.677816s     & 698.878759s     \\
+		$2000\times 2000$    & 5.421353s                          & 33.636055s    & 135.988130s    & 1499.213647s    \\
+		\hline
+	\end{tabular}
+	\caption{Execution times of the \texttt{heat\_parallel} program.}
+	\label{tab:omp_times}
+\end{table}
+
+\newpage
+\subsection{Speedup and Efficiency}
+Speedup formula:
+\begin{equation}
+	S = \frac{T_{serial}}{T_{parallel}}
+\end{equation}
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lcccc}
+		\hline
+		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{2-5}
+		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$100\times 100$      & 1.63                               & 2.48          & 0.04           & 0.32            \\
+		$1000\times 1000$    & 0.72                               & 0.95          & 3.56           & 1.53            \\
+		$2000\times 2000$    & 0.87                               & 1.42          & 3.69           & 2.88            \\
+		\hline
+	\end{tabular}
+	\caption{Speedup of the parallel program with respect to the serial one.}
+	\label{tab:speedup}
+\end{table}
+
+Efficiency formula:
+\begin{equation}
+	E = \frac{S}{P}
+\end{equation}
+
+Where $P$ is the number of threads used. In our case, we used 4 threads.
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lcccc}
+		\hline
+		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{2-5}
+		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$100\times 100$      & 0.41                               & 0.62          & 0.01           & 0.08            \\
+		$1000\times 1000$    & 0.18                               & 0.24          & 0.89           & 0.38            \\
+		$2000\times 2000$    & 0.22                               & 0.36          & 0.92           & 0.72            \\
+		\hline
+	\end{tabular}
+	\caption{Efficiency of the parallel program with respect to the serial one.}
+	\label{tab:efficiency}
+\end{table}
+
+\subsection{Scalability Analysis}
+The program demonstrates good scalability, particularly for larger matrix sizes and higher iteration counts. The speedup and efficiency metrics indicate that the parallel implementation effectively utilizes available resources, especially for larger problem sizes.
+
+
+
+\end{document}
