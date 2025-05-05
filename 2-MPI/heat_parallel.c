@@ -227,7 +227,7 @@ int main(int argc, char **argv)
     nx = ny = atoi(argv[1]);
     r = ALPHA * DT / (DX * DY);
     steps = atoi(argv[2]);
-    time_begin = omp_get_wtime();
+    time_begin = MPI_Wtime();
 
     // Static descomposition of the grid
     int rows_per_proc = nx / size; //! Will cause problems if nx is not divisible by size
@@ -290,8 +290,8 @@ int main(int argc, char **argv)
     free(local_grid);
     free(local_new_grid);
 
-    time_end = omp_get_wtime();
-    printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", time_end - time_begin, nx, nx, steps);
+    time_end = MPI_Wtime();
+    printf("%d;%d;%f;%d;%d;%d\n", rank, size, time_end - time_begin, nx, nx, steps);
 
     MPI_Finalize();
     return 0;
