@@ -29,10 +29,12 @@ else()
     set_target_properties(OpenMP::OpenMP_C PROPERTIES
       IMPORTED_LOCATION "${HOMEBREW_OMP_LIB}"
       INTERFACE_INCLUDE_DIRECTORIES "${HOMEBREW_OMP_INCLUDE}"
-      INTERFACE_COMPILE_OPTIONS "${OpenMP_C_FLAGS}"
-    )
+      INTERFACE_COMPILE_OPTIONS "${OpenMP_C_FLAGS}")
   else()
-    message(FATAL_ERROR "OpenMP not available. On Linux install libgomp (e.g. via GCC).")
+    # Fallback on Linux: manual flags if find_package failed
+    message(WARNING "OpenMP module not detected; falling back to -fopenmp and -lgomp")
+    set(OpenMP_C_FLAGS "-fopenmp")
+    set(OpenMP_C_LIBRARIES "gomp")
   endif()
 endif()
 
@@ -46,7 +48,6 @@ add_executable(OMP_MPI heat_parallel.c)
 if(TARGET OpenMP::OpenMP_C)
   target_link_libraries(OMP_MPI PRIVATE OpenMP::OpenMP_C)
 else()
-  target_include_directories(OMP_MPI PRIVATE ${OpenMP_C_INCLUDE_DIRS})
   target_compile_options(OMP_MPI PRIVATE ${OpenMP_C_FLAGS})
   target_link_libraries(OMP_MPI PRIVATE ${OpenMP_C_LIBRARIES})
 endif()
