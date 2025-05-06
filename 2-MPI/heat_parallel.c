@@ -63,15 +63,25 @@ void solve_heat_equation(double *grid, double *new_grid,
     double *temp;
     for (step = 0; step < steps; step++)
     {
-        // Exchange boundary rows with neighboring processes
-        if (rank > 0)
-            MPI_Sendrecv(&grid[ny], ny, MPI_DOUBLE, rank - 1, 0,
-                         &grid[0], ny, MPI_DOUBLE, rank - 1, 1,
-                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        if (rank < size - 1)
-            MPI_Sendrecv(&grid[(nx - 2) * ny], ny, MPI_DOUBLE, rank + 1, 1,
-                         &grid[(nx - 1) * ny], ny, MPI_DOUBLE, rank + 1, 0,
-                         MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        // Exchange boundary rows with neighboring processes (non-blocking)
+        {
+            MPI_Request reqs[4];
+            int req_cnt = 0;
+
+            if (rank > 0)
+            {
+                MPI_Irecv(&grid[0], ny, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &reqs[req_cnt++]);
+                MPI_Isend(&grid[ny], ny, MPI_DOUBLE, rank - 1, 1, MPI_COMM_WORLD, &reqs[req_cnt++]);
+            }
+
+            if (rank < size - 1)
+            {
+                MPI_Irecv(&grid[(nx - 1) * ny], ny, MPI_DOUBLE, rank + 1, 1, MPI_COMM_WORLD, &reqs[req_cnt++]);
+                MPI_Isend(&grid[(nx - 2) * ny], ny, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &reqs[req_cnt++]);
+            }
+
+            MPI_Waitall(req_cnt, reqs, MPI_STATUSES_IGNORE);
+        }
 
 #pragma omp parallel for private(i, j) collapse(2)
         for (i = 1; i < nx - 1; i++)
