@@ -9,36 +9,25 @@
 #$ -cwd
 
 ## Parallel programming environment (mpich) to instantiate and number of computing slots.
-#$ -pe mpich 8 
+#$ -pe mpich 4
 
-## The  name  of  the  job.
-#$ -N EP_B 
+#$ -j y
 
-## Send an email at the start and the end of the job.
-#$ -m be
 
-## The email to send the queue manager notifications. 
-#$ -M Your_email@alumnes.udl.cat
-
-## The folders to save the standard and error outputs.
-#$ -o $HOME/NPB3.3.1/NPB3.3-MPI/bin
-#$ -e $HOME
+if [ "$#" -ne 3 ]; then
+  echo "Usage: $0 <program> <size> <steps>"
+  exit 1
+fi
+program=$1
+size=$2
+steps=$3
 
 MPICH_MACHINES=$TMPDIR/mpich_machines
 cat $PE_HOSTFILE | awk '{print $1":"$2}' > $MPICH_MACHINES
 
-# now the script
-if [ "$#" -ne 4 ]; then
-  echo "Usage: $0 <program> <size> <steps> <threads>"
-  exit 1
-fi
 
-program=$1
-size=$2
-steps=$3
-threads=$4
+output_file="${program}_th${NSLOTS}_sz${size}_st${steps}.bmp"
 
-output_file="${program}_th${threads}_sz${size}_st${steps}.bmp"
 
 ## In this line you have to write the command that will execute your application.
 mpiexec -f $MPICH_MACHINES -n $NSLOTS ./"$program" "$size" "$steps" "$output_file"
