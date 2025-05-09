@@ -44,7 +44,7 @@
 	\HRule\\[0.4cm]
 
 	{\huge\bfseries HPC Project: Heat Diffusion Equation}\\[0.4cm]
-	{\LARGE First Delivery (OpenMP)}
+	{\LARGE Second Delivery (Hybrid Implementation with OpenMP-MPI)}
 	\HRule\\[1.5cm]
 
 	\textsc{Marc Gaspà Joval\\Raul Hidalgo Caballero}
@@ -60,97 +60,47 @@
 \listoftables
 \pagebreak
 
-\section{Main Decisions Taken to Parallelize the Problem}
+\section{Strategy}
+From the two possible strategies, we used the \textbf{Static mapping of tasks} strategy. The main reason we chose this approach is that it is faster to implement and easier to understand.
 
-We encountered we SMPD (Single Program Multiple Data) problem which we could parallelize using OpenMP.
+\subsection{Static mapping of tasks}
+In our case, we have a 2D grid of	 size $N \times N$, and we want to divide it into $P$ subgrids, which correspond to the number of slots we will allocate in the cluster.
 \\\\
-This section details each part of the serial code that was identified as suitable for parallelization, along with the strategies employed.
-\\\\
-Also we applied some optimizations to the code, like not recalculating the array indexes for each operation, instead we calculated them once and stored them in a variable.
+Although the image in the assignment suggests dividing into square subgrids, we decided to divide the grid into rectangular subgrids. This choice allows for better memory locality and improved cache usage.
 
-\subsection{Grid Initialization (initialize\_grid)}
-
-\subsubsection{Parallelizable Section}
-The initialization loop sets the temperature for each cell independently.
-\begin{lstlisting}[language=C, basicstyle=\scriptsize\ttfamily]
-for (i = 0; i < nx; i++) {
-	for (j = 0; j < ny; j++) {
-		int inyj = i * ny + j;
-		if (i == j) { grid[inyj] = 1500.0; }
-		else if (i == nx - 1 - j) { grid[inyj] = 1500.0; }
-		else { grid[inyj] = 0.0; }
-	}
-}
-\end{lstlisting}
-
-
-\subsubsection{Strategy}
-In this case as there aren't any dependencies we used \texttt{\#pragma omp parallel for} with the \texttt{collapse(2)} clause on the nested loops to distribute the iterations.
-
-\pagebreak
-\subsection{Computation of the Heat Equation (solve\_heat\_equation)}
-
-\subsubsection{Parallelizable Section}
-In this case, as one step is dependent of the previous one we cannot parallelize the outer loop. However, the inner loop can parallelize two parts, the first one is the aplication of the heat equation:
-\begin{lstlisting}[language=C, basicstyle=\scriptsize\ttfamily]
-for (i = 1; i < nx - 1; i++) {
-	for (j = 1; j < ny - 1; j++) {
-		int inyj = i * ny + j;
-		new_grid[inyj] = grid[inyj]
-		+ r * (grid[(i + 1) * ny + j] + grid[(i - 1) * ny + j] - 2 * grid[inyj])
-		+ r * (grid[inyj + 1] + grid[inyj - 1] - 2 * grid[inyj]);
-	}
-}
-\end{lstlisting}
-The second one is the application of the boundary conditions:
-\begin{lstlisting}[language=C, basicstyle=\scriptsize\ttfamily]
-for (i = 0; i < nx; i++) {
-		new_grid[0 * ny + i] = 0.0;
-		new_grid[ny * (nx - 1) + i] = 0.0;
-}
-
-for (j = 0; j < ny; j++) {
-		new_grid[0 + j * nx] = 0.0;
-		new_grid[(ny - 1) + j * nx] = 0.0;
-}
-
-\end{lstlisting}
-
-\subsubsection{Strategy}
-In this case we really used a similar solution for both cases, as each cell can be calculated independently from the others.
-\\
-We used \texttt{\#pragma omp parallel for} with the \texttt{collapse(2)} clause on the heat equation loop to distribute the iterations. We defined the variables \texttt{i} and \texttt{j} as private.
-\\\\
-For the boundary conditions we added \texttt{\#pragma omp parallel for} to the loops that set the values of the boundaries. We also defined the variable \texttt{i} as private in the first loop and \texttt{j} in the second one.
-
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=0.8\textwidth]{ghost_cells.png}
+	\caption{Illustration of the grid division into rectangular subgrids. And the ghost cells that are used to communicate with the neighbors.}
+	\label{fig:grid_division}
+\end{figure}
 
 \newpage
-\subsection{Data Dependency Management}
+\subsection{Communication}
+In our implementation, communication is performed at three key stages:
 
-\subsubsection{Overall Approach}
-A two-buffer scheme is employed throughout the computational phase. While one buffer holds the original data (read-only), the other is used for storing computed updates.
+\begin{itemize}
+	\item \textbf{Initialization:} Each process must receive its portion of the global grid, including two extra rows (ghost rows) for neighbor data. This is achieved using \texttt{MPI\_Scatterv}, which distributes variable-sized blocks of data to each process.
 
-\subsubsection{Synchronization}
-The swapping of pointers between \texttt{grid} and \texttt{new\_grid} is performed outside parallel regions, ensuring data integrity for the subsequent computation cycle.
+	\item \textbf{Iteration:} At the beginning of each iteration, processes exchange boundary rows with their neighbors to update ghost rows. This is done using \texttt{MPI\_Isend} and \texttt{MPI\_Irecv} for non-blocking communication, followed by \texttt{MPI\_Waitall} to ensure all communications complete before proceeding with computation.
 
-\subsection{Serial Output Operation}
+	\item \textbf{Finalization:} Once computation is complete, each process sends its subgrid back to the master process. We use \texttt{MPI\_Gatherv} to collect variable-sized subgrids and reconstruct the full grid in the master process before writing it to a file.
+\end{itemize}
 
-\subsubsection{Analysis}
-The generation and writing of the BMP file require a strict order of operations (bottom-to-top row order and specific padding for each row), which is highly sequential.
+\newpage
+\subsection{Load Balancing}
+Load balancing is not a concern in our case since the number of iterations and the number of grid cells are fixed. To ensure an even workload distribution, we divide the grid into rectangular subgrids of nearly equal size among the processes.
+\\\\
+One limitation is that we do not currently handle the case where the grid size is not divisible by the number of processes. In such scenarios, the last part of the grid may lose some rows. This could be improved by implementing a remainder handling strategy in the grid division.
 
-\subsubsection{Decision}
-The output phase remains serial due to the order dependency and the relatively small impact on overall performance. But what we did is optimize the code without parallelizing it.
-Exactly we reduced the number of times we write to the file by writing three bytes at once instead.
+
 
 \newpage
 \section{Scalability of the Program}
 
 \subsection{Performance Measurement Methodology}
 
-Execution times are measured using \texttt{omp\_get\_wtime()}.
-Testing is conducted using various grid sizes (matrix sizes) and numbers of iteration steps.
-\\\\
-Just to clarify, we run the following tests in the moore cluster where we used the full 4 cores of each node.
+In this case, as we re using MPI, we will use the \texttt{MPI\_Wtime} function to measure the time taken by each process.
 
 \subsection{Performance Metrics and Their Formulas}
 
@@ -172,21 +122,56 @@ Just to clarify, we run the following tests in the moore cluster where we used t
 	\label{tab:serial_times}
 \end{table}
 
+\newpage
 \begin{table}[h!]
 	\centering
 	\begin{tabular}{lcccc}
 		\hline
-		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\textbf{Nodes: 2} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
 		\cline{2-5}
-		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		                  & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
 		\hline
-		$100\times 100$      & 0.006104s                          & 0.040334s     & 26.465748s     & 33.893508s      \\
-		$1000\times 1000$    & 1.671250s                          & 13.486841s    & 33.677816s     & 698.878759s     \\
-		$2000\times 2000$    & 5.421353s                          & 33.636055s    & 135.988130s    & 1499.213647s    \\
+		$1000\times 1000$ & 3.226295s                          & 28.773441s    & 269.608456s    & 2451.152783s    \\
+		$100\times 100$   & 3.008608s                          & 30.182583s    & 151.455907s    & 997.242430s     \\
+		$2000\times 2000$ & 4.463269s                          & 42.416510s    & 323.633867s    & 2576.611911s    \\
 		\hline
 	\end{tabular}
-	\caption{Execution times of the \texttt{heat\_parallel} program.}
-	\label{tab:omp_times}
+	\caption{Execution times of the \texttt{heat\_parallel} hybrid program with 2 nodes.}
+	\label{tab:mpi_times_2_nodes}
+\end{table}
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lcccc}
+		\hline
+		\textbf{Nodes: 4} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{2-5}
+		                  & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$1000\times 1000$ & 3.466167s                          & 32.299433s    & 318.805040s    & 3184.036661s    \\
+		$100\times 100$   & 2.661267s                          & 26.713319s    & 372.033094s    & 2572.231210s    \\
+		$2000\times 2000$ & 5.508030s                          & 47.554560s    & 437.503118s    & 3524.018770s    \\
+		\hline
+	\end{tabular}
+	\caption{Execution times of the \texttt{heat\_parallel} hybrid program with 4 nodes.}
+	\label{tab:mpi_times_4_nodes}
+\end{table}
+
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lcccc}
+		\hline
+		\textbf{Nodes: 5} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{2-5}
+		                  & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$1000\times 1000$ & 2.874023s                          & 27.269382s    & 382.538333s    & 3183.711562s    \\
+		$100\times 100$   & 2.222764s                          & 23.600960s    & 310.150252s    & 3098.737703s    \\
+		$2000\times 2000$ & 4.407035s                          & 36.218476s    & 428.217962s    & 3336.180224s    \\
+		\hline
+	\end{tabular}
+	\caption{Execution times of the \texttt{heat\_parallel} hybrid program with 5 nodes.}
+	\label{tab:mpi_times_5_nodes}
 \end{table}
 
 \newpage
@@ -198,48 +183,110 @@ Speedup formula:
 
 \begin{table}[h!]
 	\centering
-	\begin{tabular}{lcccc}
+	\begin{tabular}{lccccc}
 		\hline
-		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
-		\cline{2-5}
-		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\textbf{Matrix Size} & \textbf{Threads} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{3-6}
+		                     &                  & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
 		\hline
-		$100\times 100$      & 1.63                               & 2.48          & 0.04           & 0.32            \\
-		$1000\times 1000$    & 0.72                               & 0.95          & 3.56           & 1.53            \\
-		$2000\times 2000$    & 0.87                               & 1.42          & 3.69           & 2.88            \\
+		$100\times 100$      & 2                & 0.003324                           & 0.003313      & 0.007131       & 0.010850        \\
+		                     & 4                & 0.003758                           & 0.003743      & 0.002903       & 0.004206        \\
+		                     & 5                & 0.004499                           & 0.004237      & 0.003482       & 0.003492        \\
+		$1000\times 1000$    & 2                & 0.371944                           & 0.444160      & 0.444608       & 0.436807        \\
+		                     & 4                & 0.346204                           & 0.395673      & 0.375998       & 0.336265        \\
+		                     & 5                & 0.417533                           & 0.468657      & 0.313354       & 0.336299        \\
+		$2000\times 2000$    & 2                & 1.064242                           & 1.122912      & 1.554411       & 1.672856        \\
+		                     & 4                & 0.862377                           & 1.001586      & 1.149843       & 1.223121        \\
+		                     & 5                & 1.077822                           & 1.315075      & 1.174776       & 1.291987        \\
 		\hline
 	\end{tabular}
-	\caption{Speedup of the parallel program with respect to the serial one.}
+	\caption{Speedup of the parallel program with respect to the serial one for different thread counts.}
 	\label{tab:speedup}
 \end{table}
 
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=0.8\textwidth]{mpi_speedup.png}
+	\caption{Scalability analysis of the program for different matrix sizes and thread counts.}
+	\label{fig:scalability_plot}
+\end{figure}
+
+\newpage
 Efficiency formula:
 \begin{equation}
 	E = \frac{S}{P}
 \end{equation}
-
-Where $P$ is the number of threads used. In our case, we used 4 threads.
+Here, $P$ represents the number of processes utilized. We used 2, 4, and 5 processes for our tests.
 
 \begin{table}[h!]
 	\centering
-	\begin{tabular}{lcccc}
+	\begin{tabular}{lccccc}
 		\hline
-		\textbf{Matrix Size} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
-		\cline{2-5}
-		                     & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\textbf{Matrix Size} & \textbf{Threads} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{3-6}
+		                     &                  & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
 		\hline
-		$100\times 100$      & 0.41                               & 0.62          & 0.01           & 0.08            \\
-		$1000\times 1000$    & 0.18                               & 0.24          & 0.89           & 0.38            \\
-		$2000\times 2000$    & 0.22                               & 0.36          & 0.92           & 0.72            \\
+		$100\times 100$      & 2                & 0.001662                           & 0.001657      & 0.003565       & 0.005425        \\
+		                     & 4                & 0.000939                           & 0.000936      & 0.000726       & 0.001052        \\
+		                     & 5                & 0.000900                           & 0.000847      & 0.000696       & 0.000698        \\
+		$1000\times 1000$    & 2                & 0.185972                           & 0.222080      & 0.222304       & 0.218403        \\
+		                     & 4                & 0.086551                           & 0.098918      & 0.093999       & 0.084066        \\
+		                     & 5                & 0.083507                           & 0.093731      & 0.062671       & 0.067260        \\
+		$2000\times 2000$    & 2                & 0.532121                           & 0.561456      & 0.777205       & 0.836428        \\
+		                     & 4                & 0.215594                           & 0.250397      & 0.287461       & 0.305780        \\
+		                     & 5                & 0.215564                           & 0.263015      & 0.234955       & 0.258397        \\
 		\hline
 	\end{tabular}
-	\caption{Efficiency of the parallel program with respect to the serial one.}
+	\caption{Efficiency of the parallel program with respect to the serial one for different thread counts.}
 	\label{tab:efficiency}
 \end{table}
 
-\subsection{Scalability Analysis}
-The program demonstrates good scalability, particularly for larger matrix sizes and higher iteration counts. The speedup and efficiency metrics indicate that the parallel implementation effectively utilizes available resources, especially for larger problem sizes.
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=0.8\textwidth]{mpi_efficiency.png}
+	\caption{Efficiency analysis of the program for different matrix sizes and thread counts.}
+	\label{fig:efficiency_plot}
+\end{figure}
 
+\subsection{Overhead Analysis}
 
+As you can see in the previous data, the overhead in our implementation is important, only seeing speedups over 1 after the 2000x2000 matrix. This is because the overhead of the communication is greater than the time spent in the computation.\\\\
+We will calculate the overhead using the following formula:
+\begin{equation}
+	O = \frac{T_{parallel} \cdot P - T_{serial}}{T_{parallel} \cdot P} \cdot 100
+\end{equation}
+Which is normalized to 100\% and gives us the percentage of time spent in communication.
+\newpage
+\begin{table}[h!]
+	\centering
+	\begin{tabular}{lccccc}
+		\hline
+		\textbf{Matrix Size} & \textbf{Threads} & \multicolumn{4}{c}{\textbf{Steps}}                                                    \\
+		\cline{3-6}
+		                     &                  & \textbf{100}                       & \textbf{1000} & \textbf{10000} & \textbf{100000} \\
+		\hline
+		$100\times 100$      & 2                & 0.060072                           & 0.602652      & 3.018318       & 19.836649       \\
+		                     & 4                & 0.106351                           & 1.067533      & 14.870524      & 102.781048      \\
+		                     & 5                & 0.111038                           & 1.179048      & 15.496713      & 154.828685      \\
+		$1000\times 1000$    & 2                & 0.005253                           & 0.044767      & 0.419347       & 3.831626        \\
+		                     & 4                & 0.012665                           & 0.116418      & 1.155350       & 11.665467       \\
+		                     & 5                & 0.013170                           & 0.123567      & 1.792822       & 14.847878       \\
+		$2000\times 2000$    & 2                & 0.002088                           & 0.018602      & 0.072104       & 0.421462        \\
+		                     & 4                & 0.008641                           & 0.071294      & 0.623476       & 4.892888        \\
+		                     & 5                & 0.008643                           & 0.066731      & 0.819015       & 6.185301        \\
+		\hline
+	\end{tabular}
+	\caption{Overhead percentage of the parallel program for different thread counts and matrix sizes (normalized).}
+	\label{tab:overhead}
+\end{table}
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=0.8\textwidth]{normalized_overhead.png}
+	\caption{Overhead analysis of the program for different matrix sizes and thread counts.}
+	\label{fig:overhead_plot}
+\end{figure}
+\noindent
+As we can see in the table and image, the overhead is very high for small matrix sizes, but it decreases as the matrix size increases. This is because the time spent in communication is less than the time spent in computation.
 
 \end{document}
