@@ -164,9 +164,9 @@ __global__ void apply_boundary_conditions(double *grid, int nx, int ny)
 int main(int argc, char **argv)
 {
 
-    int nx = 100;
-    int ny = nx;
-    int steps = 100;
+    double r;   // constant of the heat equation
+    int nx, ny; // Grid size in x-direction and y-direction
+    int steps;  // Number of time steps
 
     if (argc != 4)
     {
@@ -175,9 +175,9 @@ int main(int argc, char **argv)
         printf("Try again!!!!\n");
         return 1;
     }
-    
-
-    double r = ALPHA * DT / (DX * DY);
+    nx = ny = atoi(argv[1]);
+    r = ALPHA * DT / (DX * DY);
+    steps = atoi(argv[2]);
 
     size_t size = nx * ny * sizeof(double);
     double *grid, *new_grid;
@@ -211,7 +211,7 @@ int main(int argc, char **argv)
     }
 
     // Write BMP file
-    FILE *file = fopen("file.png", "wb");
+    FILE *file = fopen(argv[3], "wb");
     if (!file)
     {
         printf("Error opening file\n");
