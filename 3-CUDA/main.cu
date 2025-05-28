@@ -13,26 +13,25 @@
 #define T 1500     // Temperature on ºk of the heat source
 
 // Function to initialize the grid
-void initialize_grid(double *grid, int nx, int ny, int temp_source)
+__global__ void initialize_grid(double *grid, int nx, int ny)
 {
-    int i, j;
-    for (i = 0; i < nx; i++)
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < nx && j < ny)
     {
-        for (j = 0; j < ny; j++)
+        int inyj = i * ny + j;
+        if (i == j)
         {
-            int inyj = i * ny + j;
-            if (i == j)
-            {
-                grid[inyj] = 1500.0;
-            }
-            else if (i == nx - 1 - j)
-            {
-                grid[inyj] = 1500.0;
-            }
-            else
-            {
-                grid[inyj] = 0.0;
-            }
+            grid[inyj] = 1500.0;
+        }
+        else if (i == nx - 1 - j)
+        {
+            grid[inyj] = 1500.0;
+        }
+        else
+        {
+            grid[inyj] = 0.0;
         }
     }
 }
@@ -188,12 +187,19 @@ int main(int argc, char **argv)
     nx = ny = atoi(argv[1]);
     r = ALPHA * DT / (DX * DY);
     steps = atoi(argv[2]);
+    
     // Allocate memory for the grid
-    double *grid = (double *)calloc(nx * ny, sizeof(double));
-    double *new_grid = (double *)calloc(nx * ny, sizeof(double));
+    double *grid, *new_grid;
+    cudaMallocManaged(&grid, nx * ny * sizeof(double));
+    cudaMallocManaged(&new_grid, nx * ny * sizeof(double));
+
+    // Setup threadsPerBlock and numBlocks
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((ny + threadsPerBlock.x - 1) / threadsPerBlock.x, (nx + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
     // Initialize the grid
-    initialize_grid(grid, nx, ny, T);
+    initialize_grid<<<numBlocks, threadsPerBlock>>>(grid, nx, ny);
+    cudaDeviceSynchronize();
 
     // Solve heat equation
     solve_heat_equation(grid, new_grid, steps, r, nx, ny);
@@ -212,8 +218,8 @@ int main(int argc, char **argv)
     // Function to visualize the values of the temperature. Use only for debugging
     //  print_grid(grid, nx, ny);
     //  Free allocated memory
-    free(grid);
-    free(new_grid);
+    cudaFree(grid);
+    cudaFree(new_grid);
     //printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", time_end - time_begin, nx, nx, steps);
     return 0;
 }
