@@ -1,5 +1,5 @@
+#include <cuda_runtime.h>
 #include <math.h>
-#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -13,67 +13,34 @@
 #define T 1500     // Temperature on ºk of the heat source
 
 // Function to initialize the grid
-void initialize_grid(double *grid, int nx, int ny, int temp_source)
+__global__ void initialize_grid(double *grid, int nx, int ny, int temp_source)
 {
-    int i, j;
-#pragma omp parallel for private(i, j) collapse(2)
-    for (i = 0; i < nx; i++)
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < nx && j < ny)
     {
-        for (j = 0; j < ny; j++)
+        int inyj = i * ny + j;
+        if (i == j || i == nx - 1 - j)
         {
-            int inyj = i * ny + j;
-            if (i == j)
-            {
-                grid[inyj] = 1500.0;
-            }
-            else if (i == nx - 1 - j)
-            {
-                grid[inyj] = 1500.0;
-            }
-            else
-            {
-                grid[inyj] = 0.0;
-            }
+            grid[inyj] = 1500.0;
+        }
+        else
+        {
+            grid[inyj] = 0.0;
         }
     }
 }
 
-void solve_heat_equation(double *grid, double *new_grid, int steps, double r, int nx, int ny)
+__global__ void solve_heat_equation(double *grid, double *new_grid, double r, int nx, int ny)
 {
-    int step, i, j;
-    double *temp;
-    for (step = 0; step < steps; step++)
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i >= 1 && i < nx - 1 && j >= 1 && j < ny - 1)
     {
-
-// Apply equation
-#pragma omp parallel for private(i, j) collapse(2)
-        for (i = 1; i < nx - 1; i++)
-        {
-            for (j = 1; j < ny - 1; j++)
-            {
-                int inyj = i * ny + j;
-                new_grid[inyj] = grid[inyj] + r * (grid[(i + 1) * ny + j] + grid[(i - 1) * ny + j] - 2 * grid[inyj]) + r * (grid[inyj + 1] + grid[inyj - 1] - 2 * grid[inyj]);
-            }
-        }
-
-// Apply boundary conditions (Dirichlet: u=0 on boundaries)
-#pragma omp parallel for private(i)
-        for (i = 0; i < nx; i++)
-        {
-            new_grid[0 * ny + i] = 0.0;
-            new_grid[ny * (nx - 1) + i] = 0.0;
-        }
-#pragma omp parallel for private(j)
-        for (j = 0; j < ny; j++)
-        {
-            new_grid[0 + j * nx] = 0.0;
-            new_grid[(ny - 1) + j * nx] = 0.0;
-        }
-
-        // Swap the grids
-        temp = grid;
-        grid = new_grid;
-        new_grid = temp;
+        int inyj = i * ny + j;
+        new_grid[inyj] = grid[inyj] + r * (grid[(i + 1) * ny + j] + grid[(i - 1) * ny + j] - 2 * grid[inyj]) + r * (grid[i * ny + (j + 1)] + grid[i * ny + (j - 1)] - 2 * grid[inyj]);
     }
 }
 
@@ -174,15 +141,33 @@ void write_grid(FILE *file, double *grid, int nx, int ny)
     }
 }
 
+__global__ void apply_boundary_conditions(double *grid, int nx, int ny)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Top and bottom rows
+    if (idx < ny)
+    {
+        grid[idx] = 0.0;                       // Top row
+        grid[(nx - 1) * ny + idx] = 0.0;       // Bottom row
+    }
+
+    // Left and right columns
+    if (idx < nx)
+    {
+        grid[idx * ny] = 0.0;                  // Left column
+        grid[idx * ny + (ny - 1)] = 0.0;       // Right column
+    }
+}
+
 // Main function
 int main(int argc, char **argv)
 {
-    double time_begin, time_end;
-    char car;
-    double r;   // constant of the heat equation
-    int nx, ny; // Grid size in x-direction and y-direction
-    int steps;  // Number of time steps
-    // double DT;
+
+    int nx = 100;
+    int ny = nx;
+    int steps = 100;
+
     if (argc != 4)
     {
         printf("Command line wrong\n");
@@ -190,37 +175,56 @@ int main(int argc, char **argv)
         printf("Try again!!!!\n");
         return 1;
     }
-    nx = ny = atoi(argv[1]);
-    r = ALPHA * DT / (DX * DY);
-    steps = atoi(argv[2]);
-    time_begin = omp_get_wtime();
-    // Allocate memory for the grid
-    double *grid = (double *)calloc(nx * ny, sizeof(double));
-    double *new_grid = (double *)calloc(nx * ny, sizeof(double));
+    
 
-    // Initialize the grid
-    initialize_grid(grid, nx, ny, T);
+    double r = ALPHA * DT / (DX * DY);
 
-    // Solve heat equation
-    solve_heat_equation(grid, new_grid, steps, r, nx, ny);
-    // Write grid into a bmp file
-    FILE *file = fopen(argv[3], "wb");
+    size_t size = nx * ny * sizeof(double);
+    double *grid, *new_grid;
+    cudaMallocManaged(&grid, size);
+    cudaMallocManaged(&new_grid, size);
+
+    // Grid and block dimensions
+    dim3 threadsPerBlock(16, 16);
+    dim3 numBlocks((ny + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                    (nx + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    dim3 oneDimBlocks((nx > ny ? nx : ny + 255) / 256);
+
+    // Initialize grid
+    initialize_grid<<<numBlocks, threadsPerBlock>>>(grid, nx, ny, T);
+    cudaDeviceSynchronize();
+
+    // Time steps
+    for (int step = 0; step < steps; step++)
+    {
+        solve_heat_equation<<<numBlocks, threadsPerBlock>>>(grid, new_grid, r, nx, ny);
+        cudaDeviceSynchronize();
+
+        apply_boundary_conditions<<<oneDimBlocks, 256>>>(new_grid, nx, ny);
+        cudaDeviceSynchronize();
+
+        // Swap pointers
+        double *temp = grid;
+        grid = new_grid;
+        new_grid = temp;
+    }
+
+    // Write BMP file
+    FILE *file = fopen("file.png", "wb");
     if (!file)
     {
-        printf("Error opening the output file.\n");
+        printf("Error opening file\n");
         return 1;
     }
 
     write_bmp_header(file, nx, ny);
     write_grid(file, grid, nx, ny);
-
     fclose(file);
-    // Function to visualize the values of the temperature. Use only for debugging
-    //  print_grid(grid, nx, ny);
-    //  Free allocated memory
-    free(grid);
-    free(new_grid);
-    time_end = omp_get_wtime();
-    printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", time_end - time_begin, nx, nx, steps);
+
+    cudaFree(grid);
+    cudaFree(new_grid);
+
+    printf("Simulation complete! Output written to %s\n", argv[3]);
     return 0;
 }
