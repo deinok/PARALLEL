@@ -12,21 +12,6 @@
 #define DT 0.0005  // Time step
 #define T 1500     // Temperature on ºk of the heat source
 
-// Function to print the grid (optional, for debugging or visualization)
-void print_grid(double *grid, int nx, int ny)
-{
-    int i, j;
-    for (i = 0; i < nx; i++)
-    {
-        for (j = 0; j < ny; j++)
-        {
-            printf("%.2f ", grid[i * ny + j]);
-        }
-        printf("\n");
-    }
-    printf("\n");
-}
-
 // Function to initialize the grid
 void initialize_grid(double *grid, int nx, int ny, int temp_source)
 {
