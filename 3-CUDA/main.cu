@@ -199,6 +199,10 @@ int main(int argc, char **argv)
 
     // Initialize the grid
     initialize_grid<<<numBlocks, threadsPerBlock>>>(grid, nx, ny);
+    cudaError_t err1 = cudaGetLastError();
+    if (err1 != cudaSuccess) {
+        printf("CUDA kernel launch error: %s\n", cudaGetErrorString(err1));
+    }
     cudaDeviceSynchronize();
 
     // Solve heat equation
