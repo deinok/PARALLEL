@@ -242,6 +242,6 @@ int main(int argc, char **argv)
     cudaFree(new_grid);
     clock_t time_end = clock();
     clock_t cpu_time_used = ((double)(time_end - time_begin)) / CLOCKS_PER_SEC;
-    printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", cpu_time_used, nx, nx, steps);
+    printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", cpu_time_used, nx, ny, steps);
     return 0;
 }
