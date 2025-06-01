@@ -115,3 +115,19 @@ for (int step = 0; step < steps; step++)
 }
 ```
 It ensures that we always syncronize the DEVICE and to check the CUDA errors.
+
+## Metrics
+
+### Serial
+
+|           |100 | 1000 | 10000 | 100000 |
+| 100x100   |    |      |       |        |
+| 1000x1000 |    |      |       |        |
+| 2000x2000 |    |      |       |        |
+
+### Parallel
+
+|           |100 | 1000 | 10000 | 100000 |
+| 100x100   |    |      |       |        |
+| 1000x1000 |    |      |       |        |
+| 2000x2000 |    |      |       |        |
