@@ -36,39 +36,31 @@ __global__ void initialize_grid(double *grid, int nx, int ny)
     }
 }
 
-void solve_heat_equation(double *grid, double *new_grid, int steps, double r, int nx, int ny)
+__global__ void solve_heat_equation(double *grid, double *new_grid, double r, int nx, int ny)
 {
-    int step, i, j;
-    double *temp;
-    for (step = 0; step < steps; step++)
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i >= 1 && i < nx - 1 && j >= 1 && j < ny - 1)
     {
+        int inyj = i * ny + j;
+        new_grid[inyj] = grid[inyj] + r * (grid[(i + 1) * ny + j] + grid[(i - 1) * ny + j] - 2 * grid[inyj]) + r * (grid[inyj + 1] + grid[inyj - 1] - 2 * grid[inyj]);
+    }
+}
 
-        // Apply equation
-        for (i = 1; i < nx - 1; i++)
-        {
-            for (j = 1; j < ny - 1; j++)
-            {
-                int inyj = i * ny + j;
-                new_grid[inyj] = grid[inyj] + r * (grid[(i + 1) * ny + j] + grid[(i - 1) * ny + j] - 2 * grid[inyj]) + r * (grid[inyj + 1] + grid[inyj - 1] - 2 * grid[inyj]);
-            }
-        }
+__global__ void apply_boundary_conditions(double *grid, int nx, int ny)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-        // Apply boundary conditions (Dirichlet: u=0 on boundaries)
-        for (i = 0; i < nx; i++)
-        {
-            new_grid[0 * ny + i] = 0.0;
-            new_grid[ny * (nx - 1) + i] = 0.0;
-        }
-        for (j = 0; j < ny; j++)
-        {
-            new_grid[0 + j * nx] = 0.0;
-            new_grid[(ny - 1) + j * nx] = 0.0;
-        }
-
-        // Swap the grids
-        temp = grid;
-        grid = new_grid;
-        new_grid = temp;
+    if (idx < nx)
+    {
+        grid[0 * ny + idx] = 0.0;
+        grid[(nx - 1) * ny + idx] = 0.0;
+    }
+    if (idx < ny)
+    {
+        grid[idx * ny + 0] = 0.0;
+        grid[idx * ny + (ny - 1)] = 0.0;
     }
 }
 
@@ -206,7 +198,21 @@ int main(int argc, char **argv)
     cudaDeviceSynchronize();
 
     // Solve heat equation
-    solve_heat_equation(grid, new_grid, steps, r, nx, ny);
+    for (int step = 0; step < steps; step++)
+    {
+        solve_heat_equation<<<numBlocks, threadsPerBlock>>>(grid, new_grid, r, nx, ny);
+        cudaDeviceSynchronize();
+
+        // Apply BCs
+        apply_boundary_conditions<<<(nx > ny ? nx : ny + 255) / 256, 256>>>(new_grid, nx, ny);
+        cudaDeviceSynchronize();
+
+        // Swap pointers
+        double *temp = grid;
+        grid = new_grid;
+        new_grid = temp;
+    }
+
     // Write grid into a bmp file
     FILE *file = fopen(argv[3], "wb");
     if (!file)
