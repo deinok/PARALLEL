@@ -1,8 +1,8 @@
 #include <cuda_runtime.h>
+#include <chrono>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #define BMP_HEADER_SIZE 54
 #define ALPHA 0.01 // Thermal diffusivity
@@ -180,7 +180,7 @@ int main(int argc, char **argv)
     r = ALPHA * DT / (DX * DY);
     steps = atoi(argv[2]);
     
-    clock_t time_begin = clock();
+    auto start = std::chrono::high_resolution_clock::now();
 
     // Allocate memory for the grid
     double *grid, *new_grid;
@@ -240,8 +240,8 @@ int main(int argc, char **argv)
     //  Free allocated memory
     cudaFree(grid);
     cudaFree(new_grid);
-    clock_t time_end = clock();
-    clock_t cpu_time_used = ((double)(time_end - time_begin)) / CLOCKS_PER_SEC;
-    printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", cpu_time_used, nx, ny, steps);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", elapsed.count(), nx, ny, steps);
     return 0;
 }
