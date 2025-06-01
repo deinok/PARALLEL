@@ -1,5 +1,6 @@
 # HPC Project: Heat Diffusion Equation - Third Delivery
 ## Authors: Raul Hidalgo & Marc Gaspà
+## Github: [https://github.com/deinok/PARALLEL](https://github.com/deinok/PARALLEL)
 
 ## Strategy
 As our problem is a SMPD (Single Program Multiple Data) problem and we also have it already implemented in OpenMP, what we will do is transform the OpenMP to CUDA.
