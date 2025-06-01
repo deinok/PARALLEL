@@ -203,10 +203,18 @@ int main(int argc, char **argv)
     for (int step = 0; step < steps; step++)
     {
         solve_heat_equation<<<numBlocks, threadsPerBlock>>>(grid, new_grid, r, nx, ny);
+        cudaError_t err2 = cudaGetLastError();
+        if (err2 != cudaSuccess) {
+            printf("CUDA kernel launch error: %s\n", cudaGetErrorString(err1));
+        }
         cudaDeviceSynchronize();
 
         // Apply BCs
         apply_boundary_conditions<<<(nx > ny ? nx : ny + 255) / 256, 256>>>(new_grid, nx, ny);
+        cudaError_t err3 = cudaGetLastError();
+        if (err3 != cudaSuccess) {
+            printf("CUDA kernel launch error: %s\n", cudaGetErrorString(err1));
+        }
         cudaDeviceSynchronize();
 
         // Swap pointers
@@ -233,7 +241,7 @@ int main(int argc, char **argv)
     cudaFree(grid);
     cudaFree(new_grid);
     clock_t time_end = clock();
-    clock_t cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+    clock_t cpu_time_used = ((double)(time_end - time_begin)) / CLOCKS_PER_SEC;
     printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", cpu_time_used, nx, nx, steps);
     return 0;
 }
