@@ -121,17 +121,39 @@ In order to build the project we used `cmake`, using the following chain of call
 Of course, using  a better profile in `cmake` would enable better optimizations, but that is out of scope. 
 
 ### Serial
-
 |           | 100       | 1000       | 10000       | 100000       |
 |-----------|-----------|------------|-------------|--------------|
 | 100x100   | 0.011220s | 0.090778s  | 0.866678s   | 8.601631s    |
 | 1000x1000 | 1.022262s | 10.702762s | 95.275654s  | 932.119260s  |
 | 2000x2000 | 4.102707s | 42.515603s | 423.742169s | 3770.095796s |
 
-### Parallel
+In this table, we can clearly see that for small grids and steps it's so much faster.
+And that the increment of steps is linear.
 
+### Parallel
 |           | 100       | 1000      | 10000      | 100000      |
 |-----------|-----------|-----------|------------|-------------|
 | 100x100   | 0.595487s | 4.663546s | 45.774295s | 439.763672s |
 | 1000x1000 | 0.631579s | 4.821834s | 46.902149s | 464.976946s |
 | 2000x2000 | 0.775071s | 5.154828s | 48.968285s | 487.932836s |
+
+In this table, and taking in comparasion the serial one we can see that for small grids, the serial version wins in performace and for bigger grids, the parallel version starts gaining performace.
+
+### Speedup
+Speedup is Tserial / Tparallel
+
+|           | 100   | 1000  | 10000 | 100000 |
+|-----------|-------|-------|-------|--------|
+| 100x100   | 0.018 | 0.019 | 0.018 | 0.019  |
+| 1000x1000 | 1.618 | 2.219 | 2.031 | 2.004  |
+| 2000x2000 | 5.293 | 8.247 | 8.653 | 7.726  |
+
+In this table, we can clearly see by te speedup that in the configurations that allows more parallelization, the speedup is astonishing.
+
+## Conclusions
+After developing program, we found that it's pretty easy to convert a C program to a CUDA one, atleast for simple `for` loops.
+Also, we have found that switching fast from HOST to DEVICE calls, add a small overhead that slows down the algoritms.
+We can see this case in the small grid case, as it requires two calls to a kernel every step. 
+Probably with a better implementation we could avoid one of the two kernel calls and loop inside the kernel, avoiding most of the price of the context switching.
+
+It would be also interesting to see the comparasions agaist Serial, OpenMP and CUDA using SIMD (AVX512) as the context switching does not penalize.
