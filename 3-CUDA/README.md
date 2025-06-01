@@ -117,17 +117,19 @@ for (int step = 0; step < steps; step++)
 It ensures that we always syncronize the DEVICE and to check the CUDA errors.
 
 ## Metrics
+In order to build the project we used `cmake`, using the following chain of calls: `cmake -S . -B build && cmake --build ./build/ && ./build/main <size> <steps> <filename>`
+Of course, using  a better profile in `cmake` would enable better optimizations, but that is out of scope. 
 
 ### Serial
 
-|           |100 | 1000 | 10000 | 100000 |
-| 100x100   |    |      |       |        |
-| 1000x1000 |    |      |       |        |
-| 2000x2000 |    |      |       |        |
+|           | 100 | 1000 | 10000 | 100000 |
+| 100x100   |     |      |       |        |
+| 1000x1000 |     |      |       |        |
+| 2000x2000 |     |      |       |        |
 
 ### Parallel
 
-|           |100 | 1000 | 10000 | 100000 |
-| 100x100   |    |      |       |        |
-| 1000x1000 |    |      |       |        |
-| 2000x2000 |    |      |       |        |
+|           | 100       | 1000      | 10000      | 100000      |
+| 100x100   | 0.595487s | 4.663546s | 45.774295s | 439.763672s |
+| 1000x1000 |           |           |            |             |
+| 2000x2000 |           |           |            |             |
