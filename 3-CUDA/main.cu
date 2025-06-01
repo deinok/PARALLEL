@@ -180,6 +180,8 @@ int main(int argc, char **argv)
     r = ALPHA * DT / (DX * DY);
     steps = atoi(argv[2]);
     
+    clock_t time_begin = clock();
+
     // Allocate memory for the grid
     double *grid, *new_grid;
     cudaMallocManaged(&grid, nx * ny * sizeof(double));
@@ -230,6 +232,8 @@ int main(int argc, char **argv)
     //  Free allocated memory
     cudaFree(grid);
     cudaFree(new_grid);
-    //printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", time_end - time_begin, nx, nx, steps);
+    clock_t time_end = clock();
+    clock_t cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+    printf("The Execution Time=%fs with a matrix size of %dx%d and %d steps\n", cpu_time_used, nx, nx, steps);
     return 0;
 }
