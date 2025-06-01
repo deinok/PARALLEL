@@ -131,5 +131,5 @@ Of course, using  a better profile in `cmake` would enable better optimizations,
 
 |           | 100       | 1000      | 10000      | 100000      |
 | 100x100   | 0.595487s | 4.663546s | 45.774295s | 439.763672s |
-| 1000x1000 |           |           |            |             |
+| 1000x1000 | 0.631579s | 4.821834s | 46.902149s | 464.976946s |
 | 2000x2000 |           |           |            |             |
